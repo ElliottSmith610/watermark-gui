@@ -1,3 +1,4 @@
+import tkinter
 from tkinter import *
 from PIL import ImageTk, Image, ImageDraw, ImageFont
 from urllib.request import urlopen
@@ -11,6 +12,7 @@ from os import mkdir, path
 
 RAW_IMAGE: Image = None
 WATERMARKED_IMAGE: Image = None
+LOGO: Image = None
 BG = "black"
 FG = "white"
 
@@ -35,12 +37,9 @@ title.grid(row=0, column=2, columnspan=2, pady=(20, 10))
 def import_file():
     try:
         image_loc = askopenfilename()
-        image = Image.open(image_loc)
         global RAW_IMAGE
-        RAW_IMAGE = image.convert("RGBA")
-        scale_image(image)
-        watermark_label.delete(0, END)
-        watermark_label.focus()
+        RAW_IMAGE = Image.open(image_loc).convert("RGBA")
+        scale_image(RAW_IMAGE)
     except AttributeError:
         pass
 
@@ -93,16 +92,38 @@ def scale_image(image):
     canvas.itemconfig(image_container, image=canvas.image)
 
 
+def add_text():
+    watermark_label.config(state=NORMAL)
+    watermark_label.delete(0, END)
+    watermark_label.insert(END, "Insert Watermark text here")
+    watermark_import_logo.config(state=DISABLED)
+    add_watermark_button.config(command=add_watermark_text)
+
+
+def add_logo():
+    watermark_label.delete(0, END)
+    watermark_label.insert(END, "Import from files")
+    watermark_label.config(state=DISABLED)
+    watermark_import_logo.config(state=NORMAL)
+    add_watermark_button.config(command=add_watermark_logo)
+
+def import_logo():
+    logo = askopenfilename()
+    global LOGO
+    LOGO = Image.open(logo).convert("RGBA")
+
+
 def add_watermark_text():
 
+    # TODO: Create a decorator to remove duplicated code for text/logo
     try:
-        text_image = Image.new("RGBA", RAW_IMAGE.size, (255, 255, 255, 0))
+        width, height = RAW_IMAGE.size
     except AttributeError:
         watermark_label.delete(0, END)
         watermark_label.insert(END, "No image to watermark")
     else:
         text = watermark_label.get()
-        width, height = RAW_IMAGE.size
+        text_image = Image.new("RGBA", RAW_IMAGE.size, (255, 255, 255, 0))
 
         if width < 250:
             anchor_w = width - 5
@@ -116,18 +137,41 @@ def add_watermark_text():
         d = ImageDraw.Draw(text_image)
         font = ImageFont.truetype("arial.ttf", font_size)
         d.text((anchor_w, anchor_h), text, font=font, fill=(0, 0, 0, 128), anchor="rs")
-        output_image = Image.alpha_composite(RAW_IMAGE, text_image)
-        # output_image.show()
         global WATERMARKED_IMAGE
-        WATERMARKED_IMAGE = output_image
-        WATERMARKED_IMAGE.save
-        scale_image(output_image)
+        WATERMARKED_IMAGE = Image.alpha_composite(RAW_IMAGE, text_image)
+        # output_image.show()
+        # WATERMARKED_IMAGE.save
+        scale_image(WATERMARKED_IMAGE)
         save_img_txt.delete(0, END)
         save_img_txt.focus()
 
+
 def add_watermark_logo():
     # https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.paste
-    pass
+    # or https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.alpha_composite
+    try:
+        base_width, base_height = RAW_IMAGE.size
+        logo_width, logo_height = LOGO.size
+    except AttributeError:
+        watermark_label.delete(0, END)
+        watermark_label.insert(END, "No image/Logo to watermark")
+    else:
+        # text = watermark_label.get()
+
+        if base_width < 250:
+            anchor_w = base_width - 5
+            anchor_h = base_height - 5
+        else:
+            anchor_w = base_width - 25
+            anchor_h = base_height - 25
+
+        coords = (anchor_w - logo_width, anchor_h - logo_height, anchor_w, anchor_h)
+
+        global WATERMARKED_IMAGE
+        RAW_IMAGE.paste(LOGO, coords)
+        WATERMARKED_IMAGE = RAW_IMAGE
+        scale_image(WATERMARKED_IMAGE)
+
 
 def save_image():
     filename = save_img_txt.get()
@@ -165,26 +209,38 @@ open_url.grid(row=4, column=2, columnspan=2)
 
 watermark_title = Label(text="Watermark", bg=BG, fg=FG, font=HEADERS)
 watermark_title.grid(row=5, column=2, columnspan=2, pady=Y_PAD)
-watermark_label = Entry(width=32)
-watermark_label.insert(END, "Insert Watermark text here")
-watermark_label.grid(row=6, column=2, columnspan=2)
-add_watermark_button = Button(text="Add Watermark", command=add_watermark_text)
-add_watermark_button.grid(row=7, column=2, columnspan=2)
+watermark_variable = tkinter.StringVar()
+# Text
+watermark_text = Radiobutton(window, text=" Text ", bg=FG, indicatoron=False, value="text", variable=watermark_variable,
+                             command=add_text)
+watermark_text.grid(row=6, column=2)
+watermark_label = Entry(width=32, state=DISABLED)
+watermark_label.grid(row=7, column=2, columnspan=2)
+
+# Logo
+watermark_logo = Radiobutton(window, text=" Logo ", bg=FG, indicatoron=False, value="logo", variable=watermark_variable,
+                             command=add_logo)
+watermark_logo.grid(row=6, column=3, padx=(0, 30))
+watermark_import_logo = Button(text="Choose Logo", command=import_logo, state=DISABLED)
+watermark_import_logo.grid(row=8, column=2)
+
+add_watermark_button = Button(text="Add")
+add_watermark_button.grid(row=8, column=3, columnspan=2)
 
 save_title = Label(text="Save as PNG", fg=FG, bg=BG, font=HEADERS)
-save_title.grid(row=8, column=2, columnspan=2, pady=Y_PAD)
+save_title.grid(row=9, column=2, columnspan=2, pady=Y_PAD)
 save_img_txt = Entry(width=20)
-save_img_txt.grid(row=9, column=2)
+save_img_txt.grid(row=10, column=2)
 save_button = Button(text="Save", command=save_image)
-save_button.grid(row=9, column=3,)
+save_button.grid(row=10, column=3,)
 
 original_size = Label(text="Original Size:", bg=BG, fg=FG)
-original_size.grid(row=11, column=2)
+original_size.grid(row=12, column=2)
 original_size_text = Label(text="", bg=BG, fg=FG)
-original_size_text.grid(row=11, column=3)
+original_size_text.grid(row=12, column=3)
 rescaled_size = Label(text="Rescaled Size:", bg=BG, fg=FG)
-rescaled_size.grid(row=12, column=2)
+rescaled_size.grid(row=13, column=2)
 rescaled_size_text = Label(text="", bg=BG, fg=FG)
-rescaled_size_text.grid(row=12, column=3)
+rescaled_size_text.grid(row=13, column=3)
 window.mainloop()
 
