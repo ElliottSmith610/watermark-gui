@@ -2,15 +2,15 @@ from tkinter import *
 from PIL import ImageTk, Image, ImageDraw, ImageFont
 from urllib.request import urlopen
 from urllib.error import HTTPError
-import tkinter.messagebox
+import tkinter.messagebox as msgbox
 from tkinter.filedialog import asksaveasfilename, askopenfilename
-from os import mkdir
+from os import mkdir, path
 
 #TODO: Add location for watermark, anchor NW, NE, CENTER, SW, SE, using radiobuttons
 #TODO: Option to change colour/opacity for watermark
 
-RAW_IMAGE = None
-WATERMARKED_IMAGE = None
+RAW_IMAGE: Image = None
+WATERMARKED_IMAGE: Image = None
 BG = "black"
 FG = "white"
 
@@ -112,7 +112,7 @@ def add_watermark_text():
             anchor_w = width - 25
             anchor_h = height - 25
             font_size = int(width / 15)
-        print(f"{width} {font_size}")
+        # print(f"{width} {font_size}")
         d = ImageDraw.Draw(text_image)
         font = ImageFont.truetype("arial.ttf", font_size)
         d.text((anchor_w, anchor_h), text, font=font, fill=(0, 0, 0, 128), anchor="rs")
@@ -130,15 +130,25 @@ def add_watermark_logo():
     pass
 
 def save_image():
-    try:
-        rgb_im = WATERMARKED_IMAGE.convert("RGB")
-        mkdir("watermarked")
-    except AttributeError:
-        pass
-    except FileExistsError:
-        pass
+    filename = save_img_txt.get()
+    file_path = f"watermarked/{filename}.png"
+
+    if path.isfile(file_path):
+        confirmation = msgbox.askokcancel("Warning!", "Filename already exists in folder, overwrite file?")
     else:
-        rgb_im.save(f"watermarked/{save_img_txt.get()}.png")
+        confirmation = msgbox.askyesno(f"{filename}",
+                                       f"Would you like to save image as {filename}?")
+    if confirmation:
+        try:
+            rgb_im = WATERMARKED_IMAGE.convert("RGB")
+            rgb_im.save(file_path)
+        except AttributeError:
+            pass
+        except FileNotFoundError:
+            mkdir("watermarked")
+            rgb_im.save(file_path)
+        else:
+            msgbox.showinfo("Get in", "Image saved")
 
 
 image_container = canvas.create_image(250, 250)
